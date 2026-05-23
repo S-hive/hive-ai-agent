@@ -6,7 +6,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -86,6 +88,8 @@ public abstract class BaseAgent {
             log.error("error executing agent", e);
             return "执行错误" + e.getMessage();
         } finally {
+            // 总结
+
             //清理资源
             this.cleanup();
         }
@@ -99,7 +103,7 @@ public abstract class BaseAgent {
      */
     public SseEmitter runStream(String userPrompt) {
         // 创建一个超时时间长的 SseEmitter
-        SseEmitter sseEmitter = new SseEmitter(300000L); // 5 分钟超时
+        SseEmitter sseEmitter = new SseEmitter(500000L); // 5 分钟超时
         // 线程异步处理, 避免阻塞主线程
         CompletableFuture.runAsync(
                 () -> {
@@ -107,7 +111,6 @@ public abstract class BaseAgent {
                     try {
                         if (this.state != AgentState.IDLE) {
                             sseEmitter.send("错误: 无法从状态运行代理: " + this.state);
-
                             sseEmitter.complete();
                             return;
                         }
@@ -145,13 +148,50 @@ public abstract class BaseAgent {
                             results.add("Terminated: Reached max steps (" + maxSteps + ")");
                             sseEmitter.send("执行结束: 达到最大步骤 (" + maxSteps + ")");
                         }
+                        // 流式生成总结
+                        if (state == AgentState.FINISHED) {
+                            List<Message> summaryContext = new ArrayList<>(messageList);
+                            summaryContext.add(new UserMessage("任务已结束。请根据以上的执行步骤和结果，为用户提供一个清晰、简洁的最终总结回答。"));
+
+                            Prompt summaryPrompt = new Prompt(summaryContext);
+
+                            log.info("开始流式生成最终总结...");
+
+                            Flux<String> contentFlux = getChatClient().prompt(summaryPrompt)
+                                    .system(getSystemPrompt())
+                                    .stream()
+                                    .content();
+
+                            // 订阅并发送
+                            contentFlux.doOnNext(chunk -> {
+                                        try {
+                                            if (StrUtil.isNotBlank(chunk)) {
+                                                sseEmitter.send(chunk);
+                                            }
+                                        } catch (IOException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    })
+                                    .doOnError(e -> {
+                                        log.error("总结流错误", e);
+                                        try { sseEmitter.completeWithError(e); } catch (Exception ignored) {}
+                                    })
+                                    .doOnComplete(() -> {
+                                        log.info("总结完成，关闭连接");
+                                        sseEmitter.complete();
+                                    })
+                                    .subscribe();
+
+                            // 【关键】立即返回，让 subscribe 的回调去关闭连接
+                            return;
+                        }
                         sseEmitter.complete();
+
                     } catch (Exception e) {
                         state = AgentState.ERROR;
                         log.error("error executing agent", e);
                         try {
                             sseEmitter.send("执行错误: " + e.getMessage());
-                            sseEmitter.complete();
                         } catch (IOException ex) {
                             sseEmitter.completeWithError(ex);
                         }
@@ -176,6 +216,7 @@ public abstract class BaseAgent {
         });
         return sseEmitter;
     }
+
 
     /**
      * 定义单个步骤
