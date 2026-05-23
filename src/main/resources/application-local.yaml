@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: hive-ai-agent
+#  datasource:
+#    url: jdbc:postgresql://rm-cn-u3h4skcn60001vlo.rwlb.rds.aliyuncs.com:5432/hive_ai_agent
+#    username: lyl
+#    password: Liyalin@2
+#    driver-class-name: org.postgresql.Driver
+  ai:
+    dashscope:
+      api-key: sk-3bce56251af84d9ebc22776600c9e5d0
+search-api:
+  api-key: Anv4ndTcoXi5fyJhqBLLJPko
