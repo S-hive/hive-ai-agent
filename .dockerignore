@@ -1,0 +1,24 @@
+# 忽略 Git 版本控制文件
+.git
+.gitignore
+
+# 忽略 IDE 配置和缓存 (关键！解决你的问题)
+.idea
+.cache
+*.iml
+*.ipr
+*.iws
+
+# 忽略 Maven 构建产物和目标目录
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# 忽略日志和临时文件
+*.log
+tmp/
+temp/
+
+# 忽略其他常见无关文件
+README.md
+.dockerignore
+Dockerfile

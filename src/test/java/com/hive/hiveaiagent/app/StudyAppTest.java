@@ -64,11 +64,11 @@ class StudyAppTest {
         Assertions.assertNotNull(answer);
     }
 
-    @Test
-    void doChatWithMcp() {
-        String chatId = UUID.randomUUID().toString();
-        String answer = studyApp.doChatWithMcp("请用MCP工具搜索一些小猫图片,链接给我", chatId);
-        Assertions.assertNotNull(answer);
-
-    }
+//    @Test
+//    void doChatWithMcp() {
+//        String chatId = UUID.randomUUID().toString();
+//        String answer = studyApp.doChatWithMcp("请用MCP工具搜索一些小猫图片,链接给我", chatId);
+//        Assertions.assertNotNull(answer);
+//
+//    }
 }

@@ -11,4 +11,3 @@ spring:
         type: SYNC
         # stdio
         stdio: true
-
