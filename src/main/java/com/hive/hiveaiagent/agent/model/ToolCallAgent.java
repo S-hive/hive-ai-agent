@@ -41,6 +41,9 @@ public class ToolCallAgent extends ReActAgent {
     //禁用 Spring AI 内置的工具调用机制,自己维护选项和消息上下文
     private final ChatOptions chatOptions;
 
+    /** 最近一次 think 阶段模型输出的文本 */
+    private String lastThinkText = "";
+
     public ToolCallAgent(ToolCallback[] availableTools) {
         super();
         this.availableTools = availableTools;
@@ -53,11 +56,27 @@ public class ToolCallAgent extends ReActAgent {
 
 
     @Override
+    public String step() {
+        try {
+            boolean shouldAct = think();
+            if (!shouldAct) {
+                if (StrUtil.isNotBlank(lastThinkText)) {
+                    return lastThinkText;
+                }
+                return "思考完成 - 无需行动";
+            }
+            return act();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "步骤执行失败：" + e.getMessage();
+        }
+    }
+
+    @Override
     public boolean think() {
-        // 校验提示词, 拼接用户提示词
-        if (StrUtil.isBlank(getNextStepPrompt())) {
-            UserMessage userMessage = new UserMessage(getNextStepPrompt());
-            getMessageList().add(userMessage);
+        // 首次思考时注入下一步提示词，引导模型选择工具
+        if (StrUtil.isNotBlank(getNextStepPrompt()) && getMessageList().size() == 1) {
+            getMessageList().add(new UserMessage(getNextStepPrompt()));
         }
         // 调用 AI 大模型, 获取工具调用结果
         List<Message> messageList = getMessageList();
@@ -77,6 +96,7 @@ public class ToolCallAgent extends ReActAgent {
             List<AssistantMessage.ToolCall> toolCallList = assistantMessage.getToolCalls();
             // 输出提示信息
             String result = assistantMessage.getText();
+            lastThinkText = StrUtil.blankToDefault(result, "");
             log.info(getName() + "的思考：" + result);
             log.info(getName() + "选择了 " + toolCallList.size() + " 个工具");
             String toolCallInfo = toolCallList.stream()

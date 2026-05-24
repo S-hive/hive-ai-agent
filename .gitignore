@@ -1,4 +1,5 @@
 application-local.yaml
+.cursorrules
 tmp
 HELP.md
 target/
