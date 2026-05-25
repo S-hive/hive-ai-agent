@@ -33,6 +33,7 @@ public class StudyApp {
     private ChatClient chatClient;
 
     private final String SYSTEM_PROMPT;
+    private final String RESPONSE_STYLE;
 
     /**
      * 初始化
@@ -41,6 +42,7 @@ public class StudyApp {
      */
     public StudyApp(ChatModel dashscopeChatModel) throws IOException {
         this.SYSTEM_PROMPT = PromptLoader.load("prompt/SystemPrompt.md");
+        this.RESPONSE_STYLE = PromptLoader.load("prompt/StudyResponseStyle.md");
         // 初始化基于文件的对话记忆
         String fileDir = System.getProperty("user.dir") + "/tmp/chat-memory";
         FileBasedChatMemory chatMemory = new FileBasedChatMemory(fileDir);
@@ -51,7 +53,7 @@ public class StudyApp {
                 .maxMessages(20)
                 .build();*/
         chatClient = ChatClient.builder(dashscopeChatModel)
-                .defaultSystem(SYSTEM_PROMPT)
+                .defaultSystem(SYSTEM_PROMPT + "\n\n" + RESPONSE_STYLE)
                 .defaultAdvisors(
                         MessageChatMemoryAdvisor.builder(chatMemory).build(),
                         new MyLoggerAdvisor()

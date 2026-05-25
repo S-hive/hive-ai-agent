@@ -1,15 +1,19 @@
 ﻿/**
  * 使用 fetch 消费 SSE 流，兼容 Spring WebFlux 与 SseEmitter 格式
  */
+import type { ChatAttachment } from '@/types/attachment'
+
 export async function consumeSseStream(
   url: string,
   {
     onChunk,
+    onAttachment,
     onDone,
     onError,
     signal,
   }: {
     onChunk?: (chunk: string) => void
+    onAttachment?: (attachment: ChatAttachment) => void
     onDone?: () => void
     onError?: (err: Error) => void
     signal?: AbortSignal
@@ -45,11 +49,11 @@ export async function consumeSseStream(
       if (done) break
 
       buffer += decoder.decode(value, { stream: true })
-      buffer = flushSseBuffer(buffer, onChunk)
+      buffer = flushSseBuffer(buffer, onChunk, onAttachment)
     }
 
     if (buffer) {
-      emitSsePayload(buffer, onChunk)
+      emitSsePayload(buffer, onChunk, onAttachment)
     }
     onDone?.()
   } catch (err) {
@@ -59,7 +63,11 @@ export async function consumeSseStream(
   }
 }
 
-function flushSseBuffer(buffer: string, onChunk?: (chunk: string) => void) {
+function flushSseBuffer(
+  buffer: string,
+  onChunk?: (chunk: string) => void,
+  onAttachment?: (attachment: ChatAttachment) => void,
+) {
   let rest = buffer
 
   while (true) {
@@ -68,7 +76,7 @@ function flushSseBuffer(buffer: string, onChunk?: (chunk: string) => void) {
 
     const block = rest.slice(0, eventEnd)
     rest = rest.slice(eventEnd + 2)
-    emitSsePayload(block, onChunk)
+    emitSsePayload(block, onChunk, onAttachment)
   }
 
   return rest
@@ -100,18 +108,40 @@ function normalizeSseDataLines(dataLines: string[]) {
   return deduped.join('\n')
 }
 
-function emitSsePayload(block: string, onChunk?: (chunk: string) => void) {
+function parseAttachmentPayload(raw: string): ChatAttachment | null {
+  try {
+    const parsed = JSON.parse(raw) as ChatAttachment
+    if (!parsed?.id || !parsed?.fileName || !parsed?.url) {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function emitSsePayload(
+  block: string,
+  onChunk?: (chunk: string) => void,
+  onAttachment?: (attachment: ChatAttachment) => void,
+) {
   if (!block) return
 
   const lines = block.split('\n')
   const dataLines: string[] = []
+  let eventName = 'message'
 
   for (const line of lines) {
+    if (line.startsWith('event:')) {
+      eventName = line.slice(6).trim()
+      continue
+    }
     if (line.startsWith('data:')) {
       dataLines.push(line.slice(5).replace(/^\s/, ''))
-    } else if (
+      continue
+    }
+    if (
       line.trim() &&
-      !line.startsWith('event:') &&
       !line.startsWith('id:') &&
       !line.startsWith(':')
     ) {
@@ -120,7 +150,15 @@ function emitSsePayload(block: string, onChunk?: (chunk: string) => void) {
   }
 
   if (dataLines.length) {
-    onChunk?.(normalizeSseDataLines(dataLines))
+    const payload = normalizeSseDataLines(dataLines)
+    if (eventName === 'attachment') {
+      const attachment = parseAttachmentPayload(payload)
+      if (attachment) {
+        onAttachment?.(attachment)
+      }
+      return
+    }
+    onChunk?.(payload)
     return
   }
 

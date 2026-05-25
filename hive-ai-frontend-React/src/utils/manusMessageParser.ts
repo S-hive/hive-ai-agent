@@ -1,4 +1,6 @@
-﻿const STEP_PATTERN = /^Step\s+(\d+):\s*([\s\S]*)$/
+﻿import type { ChatAttachment } from '@/types/attachment'
+
+const STEP_PATTERN = /^Step\s+(\d+):\s*([\s\S]*)$/
 
 export type ManusChunkType = 'step' | 'meta' | 'error' | 'summary'
 
@@ -20,6 +22,7 @@ export interface ManusAssistantMessage {
   thinkingStartedAt: number
   thinkingDurationMs: number
   rawBuffer: string
+  attachments?: ChatAttachment[]
 }
 
 export function parseManusStepChunk(chunk: string) {

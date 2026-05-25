@@ -117,6 +117,7 @@ export function ManusChatRoom({
                       summarizing={msg.summarizing}
                       phase={msg.phase}
                       thinkingDurationMs={msg.thinkingDurationMs}
+                      attachments={msg.attachments}
                     />
                   )}
                 </div>

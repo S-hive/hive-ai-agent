@@ -1,6 +1,7 @@
 ﻿import { ChevronDown, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
+import { MessageAttachments } from '@/components/MessageAttachments'
 import { Badge } from '@/components/ui/badge'
 import {
   Collapsible,
@@ -8,6 +9,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
+import type { ChatAttachment } from '@/types/attachment'
 import { formatThinkingDuration } from '@/utils/manusMessageParser'
 
 interface ManusAssistantMessageProps {
@@ -17,6 +19,7 @@ interface ManusAssistantMessageProps {
   summarizing: boolean
   phase: 'thinking' | 'summary'
   thinkingDurationMs: number
+  attachments?: ChatAttachment[]
 }
 
 export function ManusAssistantMessage({
@@ -26,6 +29,7 @@ export function ManusAssistantMessage({
   summarizing,
   phase,
   thinkingDurationMs,
+  attachments = [],
 }: ManusAssistantMessageProps) {
   const [open, setOpen] = useState(true)
 
@@ -80,12 +84,17 @@ export function ManusAssistantMessage({
       ) : null}
 
       {showAnswer ? (
-        <article className="flex items-end gap-0.5 break-words py-1 text-[15px] leading-relaxed text-[#1f2329]">
-          <MarkdownContent content={answer} className="min-h-[1em] flex-1 min-w-0" />
-          {summarizing ? (
-            <span className="ml-0.5 inline-block animate-pulse text-[#1f2329]">|</span>
-          ) : null}
+        <article className="flex flex-col gap-0 break-words py-1 text-[15px] leading-relaxed text-[#1f2329]">
+          <div className="flex items-end gap-0.5">
+            <MarkdownContent content={answer} className="min-h-[1em] flex-1 min-w-0" />
+            {summarizing ? (
+              <span className="ml-0.5 inline-block animate-pulse text-[#1f2329]">|</span>
+            ) : null}
+          </div>
+          <MessageAttachments attachments={attachments} />
         </article>
+      ) : attachments.length ? (
+        <MessageAttachments attachments={attachments} />
       ) : null}
     </section>
   )

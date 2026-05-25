@@ -12,6 +12,10 @@ export function buildManusChatUrl(message: string) {
   const params = new URLSearchParams({ message })
   return `${API_BASE_URL}${API_PREFIX}/manus/chat?${params.toString()}`
 }
+
+export function getAttachmentDownloadUrl(id: string) {
+  return `${API_BASE_URL}/attachments/${id}`
+}
 export function doChatWithStudyAppSync(message: string, chatId: string) {
   return request.get(`${API_PREFIX}/study_app/chat/sync`, {
     params: { message, chatId },

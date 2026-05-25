@@ -1,8 +1,13 @@
 package com.hive.hiveaiagent.agent.model;
 
 import cn.hutool.core.util.StrUtil;
+import com.hive.hiveaiagent.attachment.AttachmentDto;
+import com.hive.hiveaiagent.attachment.AttachmentRegistry;
+import com.hive.hiveaiagent.attachment.AttachmentService;
+import com.hive.hiveaiagent.attachment.ChatAttachment;
 import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -22,8 +27,9 @@ import java.util.concurrent.CompletableFuture;
  * 子类必须实现step方法。
  */
 @Data
-@Slf4j
 public abstract class BaseAgent {
+
+    private static final Logger log = LoggerFactory.getLogger(BaseAgent.class);
 
     // 核心属性
     private String name;
@@ -31,6 +37,7 @@ public abstract class BaseAgent {
     // 提示词
     private String systemPrompt;
     private String nextStepPrompt;
+    private String summaryUserPrompt = "任务已结束。请根据以上的执行步骤和结果，为用户提供一个清晰、简洁的最终总结回答。";
 
     // 代理状态
     private AgentState state = AgentState.IDLE;
@@ -44,6 +51,8 @@ public abstract class BaseAgent {
 
     // Memory 记忆(需要自主维护会话上下文)
     private List<Message> messageList = new ArrayList<>();
+
+    private transient AttachmentService attachmentService;
 
     /**
      * 运行代理
@@ -124,6 +133,7 @@ public abstract class BaseAgent {
                     }
 
                     try {
+                        AttachmentRegistry.begin();
                         // 执行，更改状态
                         this.state = AgentState.RUNNING;
                         // 记录消息上下文
@@ -141,6 +151,7 @@ public abstract class BaseAgent {
                             results.add(result);
                             // 输出当前每一步的结果到 SSE
                             sseEmitter.send(result);
+                            flushAttachmentEvents(sseEmitter);
                         }
                         // 检查是否超出步骤限制
                         if (currentStep >= maxSteps) {
@@ -151,14 +162,14 @@ public abstract class BaseAgent {
                         // 流式生成总结
                         if (state == AgentState.FINISHED) {
                             List<Message> summaryContext = new ArrayList<>(messageList);
-                            summaryContext.add(new UserMessage("任务已结束。请根据以上的执行步骤和结果，为用户提供一个清晰、简洁的最终总结回答。"));
+                            summaryContext.add(new UserMessage(this.summaryUserPrompt));
 
                             Prompt summaryPrompt = new Prompt(summaryContext);
 
                             log.info("开始流式生成最终总结...");
 
-                            Flux<String> contentFlux = getChatClient().prompt(summaryPrompt)
-                                    .system(getSystemPrompt())
+                            Flux<String> contentFlux = this.chatClient.prompt(summaryPrompt)
+                                    .system(this.systemPrompt)
                                     .stream()
                                     .content();
 
@@ -178,6 +189,10 @@ public abstract class BaseAgent {
                                     })
                                     .doOnComplete(() -> {
                                         log.info("总结完成，关闭连接");
+                                        try {
+                                            flushAttachmentEvents(sseEmitter);
+                                        } catch (Exception ignored) {
+                                        }
                                         sseEmitter.complete();
                                     })
                                     .subscribe();
@@ -196,6 +211,7 @@ public abstract class BaseAgent {
                             sseEmitter.completeWithError(ex);
                         }
                     } finally {
+                        AttachmentRegistry.clear();
                         //清理资源
                         this.cleanup();
                     }
@@ -230,5 +246,19 @@ public abstract class BaseAgent {
      */
     protected void cleanup() {
         // 子类可以重写此方法来清理资源
+    }
+
+    private void flushAttachmentEvents(SseEmitter sseEmitter) throws IOException {
+        if (attachmentService == null) {
+            AttachmentRegistry.drainAll();
+            return;
+        }
+        List<ChatAttachment> attachments = AttachmentRegistry.drainAll();
+        for (ChatAttachment attachment : attachments) {
+            AttachmentDto dto = attachmentService.toDto(attachment);
+            sseEmitter.send(SseEmitter.event()
+                    .name("attachment")
+                    .data(dto));
+        }
     }
 }

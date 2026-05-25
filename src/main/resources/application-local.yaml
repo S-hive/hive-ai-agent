@@ -11,3 +11,5 @@ spring:
       api-key: sk-3bce56251af84d9ebc22776600c9e5d0
 search-api:
   api-key: Anv4ndTcoXi5fyJhqBLLJPko
+baidu:
+  api-key: 5bb4e5d13b57cf7da1b5b80135945e2c

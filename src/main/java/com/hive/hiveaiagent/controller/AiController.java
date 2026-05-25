@@ -2,6 +2,7 @@ package com.hive.hiveaiagent.controller;
 
 import com.hive.hiveaiagent.agent.model.HiveManus;
 import com.hive.hiveaiagent.app.StudyApp;
+import com.hive.hiveaiagent.attachment.AttachmentService;
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
@@ -27,6 +28,9 @@ public class AiController {
 
     @Resource
     private ChatModel dashscopeChatModel;
+
+    @Resource
+    private AttachmentService attachmentService;
 
     /**
      * 同步调用 AI 应用
@@ -98,7 +102,7 @@ public class AiController {
      */
     @GetMapping("/manus/chat")
     public SseEmitter doChatWithManus(String message) {
-        HiveManus hiveManus = new HiveManus(allTools, dashscopeChatModel);
+        HiveManus hiveManus = new HiveManus(allTools, dashscopeChatModel, attachmentService);
         return hiveManus.runStream(message);
     }
 }

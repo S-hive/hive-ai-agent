@@ -1,6 +1,8 @@
 package com.hive.hiveaiagent.agent.model;
 
 import com.hive.hiveaiagent.adviso.MyLoggerAdvisor;
+import com.hive.hiveaiagent.attachment.AttachmentService;
+import com.hive.hiveaiagent.util.PromptLoader;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
@@ -8,22 +10,18 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class HiveManus extends ToolCallAgent {
-    public HiveManus(ToolCallback[] allTools, ChatModel dashscopeChatModel) {
+    public HiveManus(ToolCallback[] allTools, ChatModel dashscopeChatModel, AttachmentService attachmentService) {
         super(allTools);
+        this.setAttachmentService(attachmentService);
         this.setName("hiveManus");
-        String SYSTEM_PROMPT = """
-                You are hiveManus, an all-capable AI assistant, aimed at solving any task presented by the user.
-                You have various tools at your disposal that you can call upon to efficiently complete complex requests.
-                """;
-        this.setSystemPrompt(SYSTEM_PROMPT);
+        try {
+            this.setSystemPrompt(PromptLoader.load("prompt/SystemPrompt.md"));
+            this.setNextStepPrompt(PromptLoader.load("prompt/ManusNextStepPrompt.md"));
+            this.setSummaryUserPrompt(PromptLoader.load("prompt/ManusSummaryPrompt.md"));
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to load Manus prompts", e);
+        }
 
-        String NEXT_STEP_PROMPT = """
-                Based on user needs, proactively select the most appropriate tool or combination of tools.
-                For complex tasks, you can break down the problem and use different tools step by step to solve it.
-                After using each tool, clearly explain the execution results and suggest the next steps.
-                If you want to stop the interaction at any point, use the `terminate` tool/function call.
-                """;
-        this.setNextStepPrompt(NEXT_STEP_PROMPT);
         this.setMaxSteps(20);
         // 初始化 AI 对话客户端
         ChatClient chatClient = ChatClient.builder(dashscopeChatModel)

@@ -31,6 +31,7 @@ function createAssistantPlaceholder(): ManusAssistantMessage {
     thinkingStartedAt: Date.now(),
     thinkingDurationMs: 0,
     rawBuffer: '',
+    attachments: [],
   }
 }
 
@@ -66,6 +67,21 @@ export function useManusChatStream(buildUrl: (message: string) => string) {
               const updated = { ...msg, rawBuffer: msg.rawBuffer + chunk }
               appendManusChunk(updated, chunk)
               return { ...updated }
+            }),
+          )
+        },
+        onAttachment: (attachment) => {
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.role !== 'assistant' || msg.id !== assistant.id) return msg
+              const existing = msg.attachments ?? []
+              if (existing.some((item) => item.id === attachment.id)) {
+                return msg
+              }
+              return {
+                ...msg,
+                attachments: [...existing, attachment],
+              }
             }),
           )
         },
